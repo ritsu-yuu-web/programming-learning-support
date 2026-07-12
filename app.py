@@ -189,7 +189,14 @@ if len(weak_categories) > 0:
     st.info(f"あなたの苦手分野は「{category}」です。")
 
     st.success(recommendations[category]["message"])
-    advice = ai.generate_advice(category)
+    
+
+    try:
+        advice = ai.generate_advice(category)
+
+    except Exception:
+        advice = "現在AIアドバイスを取得できません。苦手分野を重点的に復習してみましょう。"
+
     st.subheader("🤖 AIアドバイス")
 
     st.info(advice)
@@ -201,3 +208,4 @@ if len(weak_categories) > 0:
 
 else:
     st.success("まだ学習記録がありません。まずは問題を解いてみましょう！")
+

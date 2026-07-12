@@ -1,5 +1,7 @@
 import sqlite3
 
+from datetime import datetime
+
 def create_database():
     conn = sqlite3.connect("study.db")
     cursor = conn.cursor()
@@ -252,3 +254,26 @@ def get_goal():
         "goal_problems":goal[0],
         "goal_time":goal[1]
     }
+
+
+#AI問題解答記録
+def save_ai_result(category, is_correct):
+
+    conn = sqlite3.connect("study.db")
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        INSERT INTO study_logs
+        (study_date, study_time, category, problem_name, result, memo)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (
+        datetime.now().strftime("%Y-%m-%d"),
+        0,
+        category,
+        "AI生成問題",
+        "正解" if is_correct else "不正解",
+        "Gemini"
+    ))
+
+    conn.commit()
+    conn.close()
