@@ -1,14 +1,29 @@
 import sqlite3
+import hashlib
 
-from datetime import datetime
+def hash_password(password):
+    """パスワードをSHA-256でハッシュ化する"""
+    return hashlib.sha256(password.encode()).hexdigest()
 
 def create_database():
     conn = sqlite3.connect("study.db")
     cursor = conn.cursor()
 
+    # ユーザーテーブルの作成
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS users(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    # 学習ログテーブル
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS study_logs(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
         study_date TEXT,
         study_time INTEGER,
         category TEXT,
@@ -18,31 +33,72 @@ def create_database():
     )
     """)
 
+    # 目標設定テーブル
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS goals(
-        id INTEGER PRIMARY KEY,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER UNIQUE,
         goal_problems INTEGER,
         goal_time INTEGER
     )
     """)
 
+    # 既存データベース向けのマイグレーション処理 (user_id カラム追加)
+    cursor.execute("PRAGMA table_info(study_logs)")
+    columns = [info[1] for info in cursor.fetchall()]
+    if "user_id" not in columns:
+        cursor.execute("ALTER TABLE study_logs ADD COLUMN user_id INTEGER")
+
+    cursor.execute("PRAGMA table_info(goals)")
+    columns = [info[1] for info in cursor.fetchall()]
+    if "user_id" not in columns:
+        cursor.execute("ALTER TABLE goals ADD COLUMN user_id INTEGER")
+
     conn.commit()
     conn.close()
 
+def register_user(username, password):
+    """新規ユーザーを登録する。登録完了時にデフォルトの学習目標も作成する。"""
+    try:
+        conn = sqlite3.connect("study.db")
+        cursor = conn.cursor()
+        pw_hash = hash_password(password)
+        cursor.execute("INSERT INTO users (username, password_hash) VALUES (?, ?)", (username, pw_hash))
+        user_id = cursor.lastrowid
+        
+        # 新規ユーザー用の初期目標を設定 (10問、300分)
+        cursor.execute("INSERT OR IGNORE INTO goals (user_id, goal_problems, goal_time) VALUES (?, 10, 300)", (user_id, 10, 300))
+        
+        conn.commit()
+        conn.close()
+        return True, user_id
+    except sqlite3.IntegrityError:
+        conn.close()
+        return False, "このユーザー名は既に使われています。"
+    except Exception as e:
+        conn.close()
+        return False, str(e)
 
-def save_log(
-    study_date,
-    study_time,
-    category,
-    problem_name,
-    result,
-    memo
-):
+def login_user(username, password):
+    """ユーザー名とパスワードを検証し、成功した場合は user_id を返す"""
+    conn = sqlite3.connect("study.db")
+    cursor = conn.cursor()
+    pw_hash = hash_password(password)
+    cursor.execute("SELECT id FROM users WHERE username = ? AND password_hash = ?", (username, pw_hash))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        return row[0]
+    return None
+
+def save_log(user_id, study_date, study_time, category, problem_name, result, memo):
+    """学習ログを特定のユーザーIDに関連づけて保存する"""
     conn = sqlite3.connect("study.db")
     cursor = conn.cursor()
 
     cursor.execute("""
     INSERT INTO study_logs(
+        user_id,
         study_date,
         study_time,
         category,
@@ -50,9 +106,10 @@ def save_log(
         result,
         memo
     )
-    VALUES (?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
     """,
     (
+        user_id,
         str(study_date),
         study_time,
         category,
@@ -64,216 +121,74 @@ def save_log(
     conn.commit()
     conn.close()
 
-
-TEST_VARIABLE = "hello"
-
-def get_logs():
-
+def get_statistics(user_id):
+    """特定のユーザーIDの学習ログから合計問題数と総学習時間を取得する"""
     conn = sqlite3.connect("study.db")
-
     cursor = conn.cursor()
-
-    cursor.execute("""
-    SELECT
-        study_date,
-        category,
-        problem_name,
-        result,
-        study_time
-    FROM study_logs
-    ORDER BY id DESC
-    """)
-
-    logs = cursor.fetchall()
-
+    cursor.execute("SELECT COUNT(*), SUM(study_time) FROM study_logs WHERE user_id = ?", (user_id,))
+    row = cursor.fetchone()
     conn.close()
-
-    return logs
-
-def get_statistics():
-
-    conn = sqlite3.connect("study.db")
-
-    cursor = conn.cursor()
-
-    # 総学習時間
-    cursor.execute("""
-    SELECT SUM(study_time)
-    FROM study_logs
-    """)
-
-    total_time = cursor.fetchone()[0]
-
-    # 総問題数
-    cursor.execute("""
-    SELECT COUNT(*)
-    FROM study_logs
-    """)
-
-    total_problems = cursor.fetchone()[0]
-
-    conn.close()
-
+    
+    total_problems = row[0] if row[0] is not None else 0
+    total_time = row[1] if row[1] is not None else 0
     return {
-        "total_time": total_time if total_time else 0,
-        "total_problems": total_problems
+        "total_problems": total_problems,
+        "total_time": total_time
     }
 
-#学習時間の推移
-def get_daily_study_time():
-
+def get_goal(user_id):
+    """特定のユーザーIDに設定された目標（目標問題数など）を取得する"""
     conn = sqlite3.connect("study.db")
     cursor = conn.cursor()
-
-    cursor.execute("""
-    SELECT
-        study_date,
-        SUM(study_time)
-    FROM study_logs
-    GROUP BY study_date
-    ORDER BY study_date DESC
-    LIMIT 7
-    """)
-
-    data = cursor.fetchall()
-
+    cursor.execute("SELECT goal_problems, goal_time FROM goals WHERE user_id = ? LIMIT 1", (user_id,))
+    row = cursor.fetchone()
     conn.close()
-
-    return data[::-1]
-
-#分野別達成率
-def get_category_result_stats(category):
-
-    conn = sqlite3.connect("study.db")
-    cursor = conn.cursor()
-
-    cursor.execute("""
-    SELECT
-        result,
-        COUNT(*)
-    FROM study_logs
-    WHERE category = ?
-    GROUP BY result
-    """, (category,))
-
-    data = cursor.fetchall()
-
-    conn.close()
-
-    return data
-
-
-#苦手分野を計算するための関数
-def get_weak_categories():
-
-    conn = sqlite3.connect("study.db")
-    cursor = conn.cursor()
-
-    cursor.execute("""
-    SELECT
-        category,
-        SUM(CASE WHEN result='正解' THEN 1 ELSE 0 END) as correct,
-        COUNT(*) as total
-    FROM study_logs
-    GROUP BY category
-    """)
-
-    data = cursor.fetchall()
-
-    conn.close()
-
-    result_list = []
-
-    for category, correct, total in data:
-
-        accuracy = (correct / total) * 100
-
-        result_list.append(
-            (category, accuracy)
-        )
-
-    result_list.sort(
-        key=lambda x: x[1]
-    )
-
-    return result_list
-
-
-#保存関数
-def save_goal(goal_problems, goal_time):
-
-    conn = sqlite3.connect("study.db")
-    cursor = conn.cursor()
-
-    cursor.execute("""
-    DELETE FROM goals
-    """)
-
-    cursor.execute("""
-    INSERT INTO goals(
-        goal_problems,
-        goal_time
-    )
-    VALUES (?, ?)
-    """,
-    (
-        goal_problems,
-        goal_time
-    ))
-
-    conn.commit()
-    conn.close()
-
-
-#取得関数
-def get_goal():
-
-    conn = sqlite3.connect("study.db")
-    cursor = conn.cursor()
-
-    cursor.execute("""
-    SELECT
-        goal_problems,
-        goal_time
-    FROM goals
-    LIMIT 1
-    """)
-
-    goal = cursor.fetchone()
-
-    conn.close()
-
-    if goal is None:
-
+    
+    if row:
         return {
-            "goal_problems":100,
-            "goal_time":1000
+            "goal_problems": row[0],
+            "goal_time": row[1]
         }
-
     return {
-        "goal_problems":goal[0],
-        "goal_time":goal[1]
+        "goal_problems": 10,
+        "goal_time": 300
     }
 
-
-#AI問題解答記録
-def save_ai_result(category, is_correct):
-
+def get_weak_categories(user_id):
+    """特定のユーザーIDのカテゴリごとに正解率を計算し、低い（苦手な）順にソートして返す"""
     conn = sqlite3.connect("study.db")
     cursor = conn.cursor()
-
+    
     cursor.execute("""
-        INSERT INTO study_logs
-        (study_date, study_time, category, problem_name, result, memo)
-        VALUES (?, ?, ?, ?, ?, ?)
-    """, (
-        datetime.now().strftime("%Y-%m-%d"),
-        0,
-        category,
-        "AI生成問題",
-        "正解" if is_correct else "不正解",
-        "Gemini"
-    ))
+    SELECT category, 
+           COUNT(*) as total,
+           SUM(CASE WHEN result = '○' THEN 1 ELSE 0 END) as correct
+    FROM study_logs
+    WHERE user_id = ?
+    GROUP BY category
+    """, (user_id,))
+    rows = cursor.fetchall()
+    conn.close()
+    
+    weak_list = []
+    for row in rows:
+        category = row[0]
+        total = row[1]
+        correct = row[2]
+        accuracy = (correct / total * 100) if total > 0 else 0
+        weak_list.append((category, accuracy))
+        
+    # 正解率の低い順（苦手な順）にソート
+    weak_list.sort(key=lambda x: x[1])
+    return weak_list
 
+def update_goal(user_id, goal_problems, goal_time):
+    """特定のユーザーIDの目標設定（目標問題数と目標学習時間）を更新または挿入する"""
+    conn = sqlite3.connect("study.db")
+    cursor = conn.cursor()
+    cursor.execute("""
+    INSERT OR REPLACE INTO goals (user_id, goal_problems, goal_time)
+    VALUES (?, ?, ?)
+    """, (user_id, goal_problems, goal_time))
     conn.commit()
     conn.close()
