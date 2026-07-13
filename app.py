@@ -27,7 +27,7 @@ if st.session_state.user_id is None:
     with tab1:
         with st.form("login_form"):
             username = st.text_input("ユーザー名")
-            password = st.password_input("パスワード")
+            password = st.text_input("パスワード", type="password")
             submit = st.form_submit_button("ログイン", use_container_width=True)
             
             if submit:
@@ -46,8 +46,8 @@ if st.session_state.user_id is None:
     with tab2:
         with st.form("register_form"):
             new_username = st.text_input("希望ユーザー名")
-            new_password = st.password_input("パスワード")
-            confirm_password = st.password_input("パスワード（確認）")
+            new_password = st.text_input("パスワード", type="password")
+            confirm_password = st.text_input("パスワード（確認）", type="password")
             register = st.form_submit_button("アカウントを作成する", use_container_width=True)
             
             if register:
@@ -242,5 +242,6 @@ if len(weak_categories) > 0:
         st.checkbox(problem)
 else:
     st.success("まだ学習記録がありません。まずは問題を解いてみましょう！")
+
 
 
