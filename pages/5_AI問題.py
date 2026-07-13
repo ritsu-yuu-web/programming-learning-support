@@ -1,154 +1,132 @@
 import streamlit as st
-import ai
 import database
+import ai
+from datetime import date
 
+st.set_page_config(page_title="AI学習", page_icon="🤖", layout="wide")
 
-st.title("🤖 AI問題")
-
-
-if "question_number" not in st.session_state:
-    st.session_state["question_number"] = 1
-
-if "correct_count" not in st.session_state:
-    st.session_state["correct_count"] = 0
-
-if "test_finished" not in st.session_state:
-    st.session_state["test_finished"] = False
-
-
-if st.session_state["test_finished"]:
-
-    st.title("🎉 テスト終了！")
-
-    st.success(
-        f"5問中 {st.session_state['correct_count']}問正解！"
-    )
-
-    rate = st.session_state["correct_count"] / 5 * 100
-
-    st.metric("正答率", f"{rate:.0f}%")
-
-    weak = database.get_weak_categories()
-
-    if len(weak) > 0:
-        category = weak[0][0]
-    else:
-        category = "Python基礎"
-
-    try:
-        feedback = ai.generate_feedback(
-            st.session_state["correct_count"],
-            5,
-            category
-        )
-
-    except Exception:
-        feedback = f"""
-    現在AI講評を取得できませんでした。
-
-    今回の正答率は {rate:.0f}% です。
-
-    「{category}」を重点的に復習し、
-    もう一度挑戦してみましょう！
-    """
-
-
-    st.subheader("🤖 AI講評")
-
-    st.info(feedback)
-
+if "user_id" not in st.session_state or st.session_state.user_id is None:
+    st.warning("⚠️ ログインしていません。ホーム画面でログインを行ってください。")
     st.stop()
 
+st.title("🤖 AI学習（インタラクティブ問題集）")
+st.write("AIがあなたのレベルに合わせたオリジナルの問題を出題します。ここで実際に解答して学習しましょう！")
 
-st.write(f"現在の正解数：{st.session_state['correct_count']}問")
+# セッション状態の初期化
+if "current_question" not in st.session_state:
+    st.session_state.current_question = None
+if "submitted" not in st.session_state:
+    st.session_state.submitted = False
+if "saved_to_db" not in st.session_state:
+    st.session_state.saved_to_db = False
+if "selected_option" not in st.session_state:
+    st.session_state.selected_option = None
 
+categories = [
+    "Python基礎", "変数", "条件分岐", "繰り返し", 
+    "関数", "リスト", "辞書", "クラス"
+]
+difficulties = ["初級", "中級", "上級"]
 
-category = st.selectbox(
-    "分野を選択",
-    [
-        "Python基礎",
-        "変数",
-        "条件分岐",
-        "繰り返し",
-        "関数",
-        "リスト",
-        "辞書",
-        "クラス"
-    ]
-)
-
-if st.button("問題を生成"):
-
-    try:
-        question = ai.generate_question(category)
-
-    except Exception:
-
-        question = {
-            "question": "Pythonで画面に文字を表示する関数は？",
-            "choices": [
-                "print()",
-                "input()",
-                "len()",
-                "int()"
-            ],
-            "answer": "print()",
-            "explanation": "print()は文字や変数を表示する関数です。"
-        }
-
-    st.session_state["question"] = question
-
-
-if "question" in st.session_state:
-
-    question = st.session_state["question"]
-
-    st.subheader(f"📝 問題 {st.session_state['question_number']}/5")
-
-    st.write(question["question"])
-
-
-    answer = st.radio(
-        "答えを選んでください",
-        question["choices"]
-    )
-
-
-if st.button("回答する"):
-
-    selected = question["choices"].index(answer)
-
-    if selected == question["answer"]:
+# 問題生成フォーム
+if st.session_state.current_question is None:
+    st.subheader("📋 問題の設定")
+    col1, col2 = st.columns(2)
+    with col1:
+        category = st.selectbox("学習したいカテゴリ", categories)
+    with col2:
+        difficulty = st.selectbox("難易度", difficulties)
         
-        database.save_ai_result(category, True)
+    generate_btn = st.button("🚀 問題を生成する", use_container_width=True)
+    if generate_btn:
+        with st.spinner("AIが問題を生成しています..."):
+            question_data = ai.generate_question(category, difficulty)
+            st.session_state.current_question = question_data
+            st.session_state.category = category
+            st.session_state.difficulty = difficulty
+            st.session_state.submitted = False
+            st.session_state.saved_to_db = False
+            st.session_state.selected_option = None
+            st.rerun()
 
-        st.session_state["correct_count"] += 1
-
-        st.success("🎉 正解です！")
-
-    else:
+# 出題中
+else:
+    question_data = st.session_state.current_question
+    category = st.session_state.category
+    difficulty = st.session_state.difficulty
+    
+    st.info(f"📚 カテゴリ: {category}  |  📶 難易度: {difficulty}")
+    
+    st.subheader(f"Q. {question_data['title']}")
+    st.markdown(question_data["question"])
+    
+    st.write("---")
+    
+    # 選択肢
+    if not st.session_state.submitted:
+        selected = st.radio(
+            "正しいと思う選択肢を選んでください：",
+            question_data["options"],
+            index=None,
+            key="radio_options"
+        )
+        st.session_state.selected_option = selected
         
-        database.save_ai_result(category, False)
-
-        st.error("❌ 不正解です。")
-
-    st.info("💡 解説")
-
-    st.write(question["explanation"])
-
-
-if st.button("次の問題"):
-
-    if st.session_state["question_number"] < 5:
-
-        st.session_state["question_number"] += 1
-
-        del st.session_state["question"]
-
-        st.rerun()
-
+        submit_btn = st.button("回答を送信", use_container_width=True)
+        if submit_btn:
+            if selected is None:
+                st.warning("選択肢を選んでから送信してください。")
+            else:
+                st.session_state.submitted = True
+                selected_idx = question_data["options"].index(selected)
+                st.session_state.is_correct = (selected_idx == question_data["answer_index"])
+                st.rerun()
     else:
-
-        st.session_state["test_finished"] = True
-
-        st.rerun()
+        # 回答送信後の表示
+        selected = st.session_state.selected_option
+        selected_idx = question_data["options"].index(selected)
+        correct_idx = question_data["answer_index"]
+        correct_option = question_data["options"][correct_idx]
+        
+        st.write("あなたの回答:", selected)
+        
+        if st.session_state.is_correct:
+            st.balloons()
+            st.success(f"🎉 正解です！ 正解: {correct_option}")
+        else:
+            st.error(f"❌ 残念！不正解です。 正解: {correct_option}")
+            
+        st.subheader("💡 AIによる解説")
+        st.info(question_data["explanation"])
+        
+        st.write("---")
+        
+        # 学習結果のデータベース保存
+        if not st.session_state.saved_to_db:
+            save_btn = st.button("💾 この結果を学習記録（データベース）に保存する", use_container_width=True)
+            if save_btn:
+                res_char = "○" if st.session_state.is_correct else "×"
+                memo_text = f"AI学習機能で出題された問題に挑戦しました。\n[問題]: {question_data['title']}\n[解説]: {question_data['explanation']}"
+                # デフォルトの学習時間として5分を記録
+                database.save_log(
+                    user_id=st.session_state.user_id,
+                    study_date=date.today(),
+                    study_time=5,
+                    category=category,
+                    problem_name=f"[AI学習] {question_data['title']}",
+                    result=res_char,
+                    memo=memo_text
+                )
+                st.session_state.saved_to_db = True
+                st.success("結果を学習履歴に保存しました！")
+                st.rerun()
+        else:
+            st.success("✅ 学習結果は保存済みです。")
+            
+        next_btn = st.button("🔄 次の問題を解く", use_container_width=True)
+        if next_btn:
+            st.session_state.current_question = None
+            st.session_state.submitted = False
+            st.session_state.saved_to_db = False
+            st.session_state.selected_option = None
+            st.rerun()
