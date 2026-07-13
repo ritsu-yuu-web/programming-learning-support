@@ -1,122 +1,49 @@
 import streamlit as st
-import database
+import sqlite3
 import pandas as pd
+import os
 import matplotlib.pyplot as plt
 
-st.title("📊 学習状況")
+st.set_page_config(page_title="学習状況", page_icon="📈", layout="wide")
 
-stats = database.get_statistics()
+if "user_id" not in st.session_state or st.session_state.user_id is None:
+    st.warning("⚠️ ログインしていません。ホーム画面でログインを行ってください。")
+    st.stop()
 
-col1, col2 = st.columns(2)
+st.title("📈 学習状況の可視化")
+st.write("これまでの学習成果の可視化グラフです。")
 
-with col1:
-    st.metric(
-        "総学習時間",
-        f"{stats['total_time']}分"
-    )
+DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "study.db")
 
-with col2:
-    st.metric(
-        "総問題数",
-        stats["total_problems"]
-    )
+def get_logs_df(user_id):
+    conn = sqlite3.connect(DB_PATH)
+    df = pd.read_sql_query("SELECT * FROM study_logs WHERE user_id = ?", conn, params=(user_id,))
+    conn.close()
+    return df
 
-daily_data = database.get_daily_study_time()
-
-df = pd.DataFrame(
-    daily_data,
-    columns=["日付", "学習時間"]
-)
-
-#学習時間の推移
-st.subheader("📈 直近7日間の学習時間")
-
-st.bar_chart(
-    df,
-    x="日付",
-    y="学習時間"
-)
-
-#分野別達成率
-st.subheader("📊 分野別達成率")
-
-category = st.selectbox(
-    "分野を選択",
-    [
-        "Python基礎",
-        "変数",
-        "条件分岐",
-        "繰り返し",
-        "関数",
-        "リスト",
-        "辞書",
-        "クラス"
-    ]
-)
-
-
-result_stats = database.get_category_result_stats(category)
-
-if len(result_stats) == 0:
-
-    st.info("この分野の学習記録がありません")
-
-else:
-
-    labels = []
-    sizes = []
-
-    for result, count in result_stats:
-
-        labels.append(result)
-        sizes.append(count)
-
-    fig, ax = plt.subplots()
-
-    colors = []
-
-    for label in labels:
-
-        if label == "正解":
-            colors.append("green")
-
-        else:
-            colors.append("red")
-
-    ax.pie(
-        sizes,
-        labels=labels,
-        colors=colors,
-        autopct="%1.1f%%"
-    )
-
-    ax.set_title(f"{category} の達成率")
-
-    st.pyplot(fig)
-
-
-total = sum(sizes)
-
-correct_count = 0
-
-for result, count in result_stats:
-
-    if result == "正解":
-        correct_count = count
-
-accuracy = round(correct_count / total * 100, 1)
-
-st.metric(
-    "達成率",
-    f"{accuracy}%"
-)
-
-st.subheader("⚠️ 苦手分野")
-
-weak_categories = database.get_weak_categories()
-
-for i, (category, accuracy) in enumerate(weak_categories[:3]):
-
-    st.warning(
-        f"{i+1}位：{category}（正解率 {accuracy:.1f}%）"
-    )
+try:
+    df = get_logs_df(st.session_state.user_id)
+    if not df.empty:
+        col1, col2 = st.columns(2)
+        with col1:
+            st.subheader("カテゴリごとの学習時間")
+            time_by_cat = df.groupby("category")["study_time"].sum()
+            fig, ax = plt.subplots()
+            # 日本語フォントをサポートする設定（Windows標準のMS Gothic）
+            plt.rcParams['font.family'] = 'MS Gothic'
+            time_by_cat.plot(kind="bar", ax=ax, color="skyblue")
+            ax.set_ylabel("学習時間 (分)")
+            ax.set_xlabel("カテゴリ")
+            st.pyplot(fig)
+            
+        with col2:
+            st.subheader("結果（正解／不正解）の割合")
+            result_counts = df["result"].value_counts()
+            fig, ax = plt.subplots()
+            result_counts.plot(kind="pie", ax=ax, autopct="%1.1f%%", colors=["lightgreen", "lightcoral"])
+            ax.set_ylabel("")
+            st.pyplot(fig)
+    else:
+        st.info("可視化するデータがまだありません。")
+except Exception as e:
+    st.info("学習データがまだありません。")
