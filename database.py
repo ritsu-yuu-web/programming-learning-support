@@ -67,7 +67,7 @@ def register_user(username, password):
         user_id = cursor.lastrowid
         
         # 新規ユーザー用の初期目標を設定 (10問、300分)
-        cursor.execute("INSERT OR IGNORE INTO goals (user_id, goal_problems, goal_time) VALUES (?, 10, 300)", (user_id, 10, 300))
+        cursor.execute("INSERT OR IGNORE INTO goals (user_id, goal_problems, goal_time) VALUES (?, ?, ?)", (user_id, 10, 300))
         
         conn.commit()
         conn.close()
