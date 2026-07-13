@@ -1,22 +1,30 @@
 import streamlit as st
-import database
+import sqlite3
+import pandas as pd
+import os
 
-st.title("📚 学習履歴")
+st.set_page_config(page_title="学習履歴", page_icon="📋", layout="wide")
 
-logs = database.get_logs()
+if "user_id" not in st.session_state or st.session_state.user_id is None:
+    st.warning("⚠️ ログインしていません。ホーム画面でログインを行ってください。")
+    st.stop()
 
-if len(logs) == 0:
+st.title("📋 学習履歴")
+st.write("これまでの学習の記録一覧です。")
 
-    st.info("まだ学習記録がありません")
+DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "study.db")
 
-else:
+def get_all_logs(user_id):
+    conn = sqlite3.connect(DB_PATH)
+    df = pd.read_sql_query("SELECT study_date as 日付, study_time as 時間分, category as カテゴリ, problem_name as 問題名, result as 結果, memo as メモ FROM study_logs WHERE user_id = ? ORDER BY id DESC", conn, params=(user_id,))
+    conn.close()
+    return df
 
-    for log in logs:
-
-        st.write(f"📅 日付：{log[0]}")
-        st.write(f"📖 分野：{log[1]}")
-        st.write(f"📝 問題名：{log[2]}")
-        st.write(f"🎯 結果：{log[3]}")
-        st.write(f"⏰ 学習時間：{log[4]}分")
-
-        st.divider()
+try:
+    df = get_all_logs(st.session_state.user_id)
+    if not df.empty:
+        st.dataframe(df, use_container_width=True)
+    else:
+        st.info("学習履歴がまだありません。")
+except Exception as e:
+    st.info("学習履歴データがまだありません。")
