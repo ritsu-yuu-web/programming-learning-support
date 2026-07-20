@@ -2,6 +2,7 @@ import os
 import requests
 import json
 from dotenv import load_dotenv
+import streamlit as st
 
 # 環境変数（.env）の読み込み
 load_dotenv()
@@ -23,7 +24,8 @@ def call_gemini_api(api_key, prompt):
             res_data = response.json()
             return res_data['candidates'][0]['content']['parts'][0]['text']
         else:
-            print(f"Gemini API エラー: {response.status_code} - {response.text}")
+            st.error(f"Gemini API エラー: {response.status_code}")
+            st.write(response.text)
     except Exception as e:
         print(f"Gemini API 接続エラー: {e}")
     return None
