@@ -3,4 +3,4 @@ pandas
 matplotlib
 python-dotenv
 google-genai
-japanize-matplotlib
+plotly
