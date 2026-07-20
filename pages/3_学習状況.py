@@ -3,11 +3,8 @@ import sqlite3
 import pandas as pd
 import os
 import matplotlib.pyplot as plt
-import matplotlib.font_manager as fm
+import japanize_matplotlib
 
-# 日本語フォントをサポートする設定
-plt.rcParams["font.family"] = "Meiryo"
-plt.rcParams["axes.unicode_minus"] = False
 
 st.set_page_config(page_title="学習状況", page_icon="📈", layout="wide")
 
@@ -35,14 +32,9 @@ try:
             time_by_cat = df.groupby("category")["study_time"].sum()
             fig, ax = plt.subplots()
             time_by_cat.plot(kind="bar", ax=ax, color="skyblue")
-            for label in ax.get_xticklabels():
-                label.set_fontname("Meiryo")
-
-            for label in ax.get_yticklabels():
-                label.set_fontname("Meiryo")
-
-            ax.set_xlabel("カテゴリ", fontname="Meiryo")
-            ax.set_ylabel("学習時間（分）", fontname="Meiryo")
+            
+            ax.set_xlabel("カテゴリ")
+            ax.set_ylabel("学習時間（分）")
             st.pyplot(fig)
             
         with col2:
