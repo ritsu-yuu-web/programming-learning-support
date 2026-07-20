@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 
 # 日本語フォントをサポートする設定
-plt.rcParams["font.family"] = "Yu Gothic"
+plt.rcParams["font.family"] = "Meiryo"
 plt.rcParams["axes.unicode_minus"] = False
 
 st.set_page_config(page_title="学習状況", page_icon="📈", layout="wide")
@@ -35,8 +35,14 @@ try:
             time_by_cat = df.groupby("category")["study_time"].sum()
             fig, ax = plt.subplots()
             time_by_cat.plot(kind="bar", ax=ax, color="skyblue")
-            ax.set_ylabel("学習時間 (分)")
-            ax.set_xlabel("カテゴリ")
+            for label in ax.get_xticklabels():
+                label.set_fontname("Meiryo")
+
+            for label in ax.get_yticklabels():
+                label.set_fontname("Meiryo")
+
+            ax.set_xlabel("カテゴリ", fontname="Meiryo")
+            ax.set_ylabel("学習時間（分）", fontname="Meiryo")
             st.pyplot(fig)
             
         with col2:
