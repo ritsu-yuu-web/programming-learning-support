@@ -9,7 +9,7 @@ load_dotenv()
 
 def call_gemini_api(api_key, prompt):
     """Gemini APIを直接HTTPリクエストで呼び出す"""
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={api_key}"
     headers = {"Content-Type": "application/json"}
 
     payload = {
@@ -136,7 +136,7 @@ def generate_question(category, difficulty, provider="Gemini"):
 
     result = None
     if provider == "Gemini":
-        api_key = os.getenv("GOOGLE_API_KEY") or DEFAULT_GEMINI_KEY
+        api_key = os.getenv("GEMINI_API_KEY")
         if api_key:
             result = call_gemini_api(api_key, prompt)
     elif provider == "OpenAI":
