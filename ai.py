@@ -6,9 +6,6 @@ from dotenv import load_dotenv
 # 環境変数（.env）の読み込み
 load_dotenv()
 
-# デフォルトのGemini APIキー
-DEFAULT_GEMINI_KEY = "AIzaSyC2ZMIp6bXOrNiWx8xvYUlw5NN8GP2s2Bk"
-
 def call_gemini_api(api_key, prompt):
     """Gemini APIを直接HTTPリクエストで呼び出す"""
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
@@ -93,7 +90,7 @@ def generate_advice(category, provider="Gemini"):
     result = None
 
     if provider == "Gemini":
-        api_key = os.getenv("GOOGLE_API_KEY") or DEFAULT_GEMINI_KEY
+        api_key = os.getenv("GEMINI_API_KEY")
         if api_key:
             result = call_gemini_api(api_key, prompt)
 
