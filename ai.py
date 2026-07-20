@@ -169,6 +169,79 @@ def generate_question(category, difficulty, provider="Gemini"):
     # フォールバック
     return get_mock_question(category, difficulty)
 
+
+def generate_questions(category, difficulty, provider="Gemini"):
+    """
+    AIに5問まとめて生成させる
+    """
+
+    prompt = f"""
+あなたはプログラミング学習を支援する先生です。
+
+カテゴリ：{category}
+難易度：{difficulty}
+
+Pythonの4択問題を5問作成してください。
+
+以下のJSONのみ返してください。
+
+[
+  {{
+    "title":"...",
+    "question":"...",
+    "options":["","","",""],
+    "answer_index":0,
+    "explanation":"..."
+  }},
+  {{
+    ...
+  }}
+]
+
+コードブロック(```json)は使わないでください。
+"""
+
+    result = None
+
+    if provider == "Gemini":
+        api_key = os.getenv("GEMINI_API_KEY")
+        if api_key:
+            result = call_gemini_api(api_key, prompt)
+
+    elif provider == "OpenAI":
+        api_key = os.getenv("OPENAI_API_KEY")
+        if api_key:
+            result = call_openai_api(api_key, prompt)
+
+    if result:
+        cleaned = result.strip()
+
+        if cleaned.startswith("```json"):
+            cleaned = cleaned[7:]
+        elif cleaned.startswith("```"):
+            cleaned = cleaned[3:]
+
+        if cleaned.endswith("```"):
+            cleaned = cleaned[:-3]
+
+        cleaned = cleaned.strip()
+
+        try:
+            questions = json.loads(cleaned)
+
+            if isinstance(questions, list):
+                return questions
+
+        except Exception as e:
+            print(e)
+
+    # API失敗時は5問同じ形式で返す
+    return [
+        get_mock_question(category, difficulty)
+        for _ in range(5)
+    ]
+
+
 def get_mock_question(category, difficulty):
     """MOCK_QUESTIONSから該当する問題を安全に取得する"""
     cat_data = MOCK_QUESTIONS.get(category, MOCK_QUESTIONS["Python基礎"])
