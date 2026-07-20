@@ -64,9 +64,14 @@ try:
                 title="結果（正解／不正解）の割合",
                 color="result",
                 color_discrete_map={
-                    "正解": "lightgreen",
-                    "不正解": "lightcoral"
+                    "○": "#4CAF50",  #緑
+                    "×": "#F44336"   #赤
                 }
+            )
+            
+            fig.update_traces(
+                textinfo="percent+label",
+                marker=dict(line=dict(color="white", width=2))
             )
             
             st.plotly_chart(fig, use_container_width=True)
