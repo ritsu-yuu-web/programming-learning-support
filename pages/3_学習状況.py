@@ -2,8 +2,7 @@ import streamlit as st
 import sqlite3
 import pandas as pd
 import os
-import matplotlib.pyplot as plt
-import japanize_matplotlib
+import plotly.express as px
 
 
 st.set_page_config(page_title="学習状況", page_icon="📈", layout="wide")
@@ -29,21 +28,48 @@ try:
         col1, col2 = st.columns(2)
         with col1:
             st.subheader("カテゴリごとの学習時間")
-            time_by_cat = df.groupby("category")["study_time"].sum()
-            fig, ax = plt.subplots()
-            time_by_cat.plot(kind="bar", ax=ax, color="skyblue")
-            
-            ax.set_xlabel("カテゴリ")
-            ax.set_ylabel("学習時間（分）")
-            st.pyplot(fig)
+            time_by_cat = (
+                df.groupby("category")["study_time"]
+                .sum()
+                .reset_index()
+            )
+
+            fig = px.bar(
+                time_by_cat,
+                x="category",
+                y="study_time",
+                title="カテゴリごとの学習時間",
+                labels={
+                    "category": "カテゴリ",
+                    "study_time": "学習時間（分）"
+                }
+            )
+
+            st.plotly_chart(fig, use_container_width=True)
             
         with col2:
             st.subheader("結果（正解／不正解）の割合")
-            result_counts = df["result"].value_counts()
-            fig, ax = plt.subplots()
-            result_counts.plot(kind="pie", ax=ax, autopct="%1.1f%%", colors=["lightgreen", "lightcoral"])
-            ax.set_ylabel("")
-            st.pyplot(fig)
+            result_counts = (
+                df["result"]
+                .value_counts()
+                .reset_index()
+            )
+            
+            result_counts.columns = ["result", "count"]
+            
+            fig = px.pie(
+                result_counts,
+                names="result",
+                values="count",
+                title="結果（正解／不正解）の割合",
+                color="result",
+                color_discrete_map={
+                    "正解": "lightgreen",
+                    "不正解": "lightcoral"
+                }
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("可視化するデータがまだありません。")
 except Exception as e:
