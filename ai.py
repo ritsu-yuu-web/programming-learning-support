@@ -445,3 +445,48 @@ MOCK_QUESTIONS = {
     }
 }
 
+
+def generate_feedback(correct_count, total_count, category, provider="Gemini"):
+    """
+    5問終了後の講評を生成する
+    """
+
+    prompt = f"""
+あなたは優しいプログラミング講師です。
+
+学習者は
+カテゴリ「{category}」
+で {total_count}問中 {correct_count}問正解しました。
+
+以下の条件で講評してください。
+
+・100文字程度
+・初心者向け
+・優しい口調
+・頑張った点
+・改善点
+・次に勉強すると良い内容
+"""
+
+    result = None
+
+    if provider == "Gemini":
+        api_key = os.getenv("GEMINI_API_KEY")
+        if api_key:
+            result = call_gemini_api(api_key, prompt)
+
+    elif provider == "OpenAI":
+        api_key = os.getenv("OPENAI_API_KEY")
+        if api_key:
+            result = call_openai_api(api_key, prompt)
+
+    if result:
+        return result
+
+    # API失敗時のデフォルト講評
+    return (
+        f"{total_count}問中{correct_count}問正解でした！🎉\n\n"
+        "よく頑張りました！"
+        "間違えた問題は解説をもう一度確認し、"
+        f"「{category}」を復習するとさらに理解が深まります。"
+    )
