@@ -5,6 +5,10 @@ import os
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 
+# 日本語フォントをサポートする設定
+plt.rcParams["font.family"] = "Yu Gothic"
+plt.rcParams["axes.unicode_minus"] = False
+
 st.set_page_config(page_title="学習状況", page_icon="📈", layout="wide")
 
 if "user_id" not in st.session_state or st.session_state.user_id is None:
@@ -30,8 +34,6 @@ try:
             st.subheader("カテゴリごとの学習時間")
             time_by_cat = df.groupby("category")["study_time"].sum()
             fig, ax = plt.subplots()
-            # 日本語フォントをサポートする設定（Windows標準のMS Gothic）
-            plt.rcParams['font.family'] = 'Yu Gothic'
             time_by_cat.plot(kind="bar", ax=ax, color="skyblue")
             ax.set_ylabel("学習時間 (分)")
             ax.set_xlabel("カテゴリ")
