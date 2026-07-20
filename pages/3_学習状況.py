@@ -3,6 +3,7 @@ import sqlite3
 import pandas as pd
 import os
 import matplotlib.pyplot as plt
+import matplotlib.font_manager as fm
 
 st.set_page_config(page_title="学習状況", page_icon="📈", layout="wide")
 
@@ -30,7 +31,7 @@ try:
             time_by_cat = df.groupby("category")["study_time"].sum()
             fig, ax = plt.subplots()
             # 日本語フォントをサポートする設定（Windows標準のMS Gothic）
-            plt.rcParams['font.family'] = 'MS Gothic'
+            plt.rcParams['font.family'] = 'Yu Gothic'
             time_by_cat.plot(kind="bar", ax=ax, color="skyblue")
             ax.set_ylabel("学習時間 (分)")
             ax.set_xlabel("カテゴリ")
