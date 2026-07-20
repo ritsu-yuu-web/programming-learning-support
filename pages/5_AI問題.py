@@ -21,6 +21,13 @@ if "saved_to_db" not in st.session_state:
     st.session_state.saved_to_db = False
 if "selected_option" not in st.session_state:
     st.session_state.selected_option = None
+    
+if "question_list" not in st.session_state:
+    st.session_state.question_list = None
+if "current_index" not in st.session_state:
+    st.session_state.current_index = 0
+if "correct_count" not in st.session_state:
+    st.session_state.correct_count = 0
 
 categories = [
     "Python基礎", "変数", "条件分岐", "繰り返し", 
@@ -40,8 +47,18 @@ if st.session_state.current_question is None:
     generate_btn = st.button("🚀 問題を生成する", use_container_width=True)
     if generate_btn:
         with st.spinner("AIが問題を生成しています..."):
-            question_data = ai.generate_question(category, difficulty)
-            st.session_state.current_question = question_data
+            question_list = ai.generate_questions(category, difficulty)
+
+            if not question_list:
+                st.error("問題生成に失敗しました。もう一度試してください。")
+                st.stop()
+                
+            st.session_state.question_list = question_list
+            st.session_state.current_index = 0
+            st.session_state.correct_count = 0
+
+            st.session_state.current_question = question_list[0]
+            
             st.session_state.category = category
             st.session_state.difficulty = difficulty
             st.session_state.submitted = False
@@ -57,7 +74,11 @@ else:
     
     st.info(f"📚 カテゴリ: {category}  |  📶 難易度: {difficulty}")
     
-    st.subheader(f"Q. {question_data['title']}")
+    st.subheader(
+    f"問題 {st.session_state.current_index + 1} / 5"
+    )
+
+    st.markdown(f"### {question_data['title']}")
     st.markdown(question_data["question"])
     
     st.write("---")
@@ -79,7 +100,10 @@ else:
             else:
                 st.session_state.submitted = True
                 selected_idx = question_data["options"].index(selected)
-                st.session_state.is_correct = (selected_idx == question_data["answer_index"])
+                st.session_state.is_correct = (
+                    selected_idx == question_data["answer_index"])
+                if st.session_state.is_correct:
+                    st.session_state.correct_count += 1
                 st.rerun()
     else:
         # 回答送信後の表示
@@ -124,9 +148,54 @@ else:
             st.success("✅ 学習結果は保存済みです。")
             
         next_btn = st.button("🔄 次の問題を解く", use_container_width=True)
+
+        
         if next_btn:
-            st.session_state.current_question = None
-            st.session_state.submitted = False
-            st.session_state.saved_to_db = False
-            st.session_state.selected_option = None
-            st.rerun()
+         # 次の問題番号へ
+            st.session_state.current_index += 1
+        
+            # まだ問題が残っている場合
+            if st.session_state.current_index < len(st.session_state.question_list):
+        
+                st.session_state.current_question = \
+                    st.session_state.question_list[
+                        st.session_state.current_index
+                    ]
+        
+                st.session_state.submitted = False
+                st.session_state.saved_to_db = False
+                st.session_state.selected_option = None
+                
+                if "radio_options" in st.session_state:
+                    del st.session_state["radio_options"]
+        
+                st.rerun()
+        
+            # 5問終わった場合
+            else:
+        
+                st.success(
+                    f"🎉 5問終了！ {st.session_state.correct_count} / 5問正解"
+                )
+                
+                feedback = ai.generate_feedback(
+                    st.session_state.correct_count,
+                    5,
+                    category
+                )
+            
+                st.subheader("🤖 AI講評")
+                st.info(feedback)
+
+                if st.button("もう一度挑戦する"):
+                    st.session_state.current_question = None
+                    st.session_state.question_list = None
+                    st.session_state.current_index = 0
+                    st.session_state.correct_count = 0
+                    st.session_state.submitted = False
+                    st.session_state.saved_to_db = False
+                    st.session_state.selected_option = None
+            
+                    st.rerun()
+                    
+                st.stop()
